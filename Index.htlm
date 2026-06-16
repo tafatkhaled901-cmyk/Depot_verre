@@ -1,0 +1,427 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Dépôt Verre - Gestion Stock</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Segoe UI', system-ui, sans-serif; }
+        body { background: #0f172a; color: #e2e8f0; min-height: 100vh; }
+        .container { max-width: 100%; padding: 10px; }
+        
+        .header { background: linear-gradient(135deg, #1e3a5f, #2563eb); padding: 15px; text-align: center; border-radius: 0 0 16px 16px; margin-bottom: 15px; }
+        .header h1 { font-size: 1.3rem; }
+        .header p { font-size: 0.8rem; opacity: 0.8; margin-top: 5px; }
+        
+        .stats { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-bottom: 15px; }
+        .stat { background: #1e293b; padding: 15px; border-radius: 12px; text-align: center; border: 1px solid #334155; }
+        .stat h3 { font-size: 1.5rem; color: #60a5fa; }
+        .stat p { font-size: 0.75rem; color: #94a3b8; margin-top: 3px; }
+        
+        .card { background: #1e293b; border-radius: 16px; padding: 15px; margin-bottom: 15px; border: 1px solid #334155; }
+        .card-title { font-size: 1rem; margin-bottom: 12px; color: #94a3b8; display: flex; align-items: center; gap: 8px; }
+        
+        .mode { display: flex; gap: 10px; margin-bottom: 15px; }
+        .mode button { flex: 1; padding: 12px; border: 2px solid #334155; border-radius: 10px; background: #0f172a; color: #e2e8f0; font-weight: bold; cursor: pointer; text-align: center; }
+        .mode button.active { background: #16a34a; border-color: #22c55e; color: white; }
+        .mode button.active.out { background: #dc2626; border-color: #ef4444; }
+        
+        .input-big { width: 100%; padding: 15px; font-size: 1.2rem; background: #0f172a; border: 2px solid #334155; border-radius: 10px; color: #e2e8f0; text-align: center; font-family: monospace; margin-bottom: 10px; }
+        .input-big:focus { outline: none; border-color: #2563eb; }
+        
+        .btn { width: 100%; padding: 14px; border: none; border-radius: 10px; font-weight: bold; cursor: pointer; color: white; font-size: 1rem; }
+        .btn-blue { background: #2563eb; }
+        .btn-green { background: linear-gradient(135deg, #16a34a, #22c55e); }
+        .btn-red { background: linear-gradient(135deg, #dc2626, #ef4444); }
+        
+        .detected { background: #14532d; border: 1px solid #22c55e; border-radius: 10px; padding: 12px; margin-bottom: 15px; display: none; }
+        .detected.show { display: block; }
+        .detected h4 { color: #4ade80; margin-bottom: 8px; }
+        .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+        .info-cell { background: #0f172a; padding: 8px; border-radius: 6px; text-align: center; }
+        .info-cell .label { font-size: 0.65rem; color: #64748b; text-transform: uppercase; }
+        .info-cell .value { font-size: 1.1rem; font-weight: bold; color: #e2e8f0; }
+        
+        .form-group { margin-bottom: 12px; }
+        .form-group label { display: block; margin-bottom: 5px; font-size: 0.8rem; color: #94a3b8; }
+        .form-group input, .form-group select { width: 100%; padding: 10px; background: #0f172a; border: 2px solid #334155; border-radius: 8px; color: #e2e8f0; font-size: 0.95rem; }
+        .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+        
+        .filters { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 5px; margin-bottom: 10px; }
+        .chip { padding: 6px 14px; background: #1e293b; border: 1px solid #334155; border-radius: 20px; font-size: 0.75rem; color: #94a3b8; cursor: pointer; white-space: nowrap; }
+        .chip.active { background: #2563eb; color: white; border-color: #2563eb; }
+        
+        .item { padding: 12px; border-bottom: 1px solid #334155; display: flex; justify-content: space-between; align-items: center; }
+        .item:last-child { border-bottom: none; }
+        .item-info h4 { font-size: 0.95rem; margin-bottom: 3px; }
+        .item-info p { font-size: 0.75rem; color: #64748b; }
+        .badge { padding: 4px 10px; border-radius: 12px; font-size: 0.75rem; font-weight: bold; }
+        .bg-green { background: #14532d; color: #4ade80; }
+        .bg-red { background: #7f1d1d; color: #f87171; }
+        
+        .history-item { padding: 10px; border-bottom: 1px solid #334155; }
+        .history-item:last-child { border-bottom: none; }
+        .hist-date { font-size: 0.7rem; color: #64748b; margin-bottom: 4px; }
+        .hist-content { display: flex; justify-content: space-between; }
+        .hist-type { font-weight: bold; font-size: 0.85rem; }
+        .hist-in { color: #4ade80; }
+        .hist-out { color: #f87171; }
+        
+        .empty { text-align: center; padding: 40px; color: #475569; }
+        .empty i { font-size: 2.5rem; margin-bottom: 10px; }
+        
+        .toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: #1e293b; padding: 12px 24px; border-radius: 10px; display: none; border: 1px solid #22c55e; color: #4ade80; z-index: 1000; font-size: 0.9rem; max-width: 90%; text-align: center; }
+        .toast.show { display: block; }
+        .toast.err { border-color: #ef4444; color: #f87171; }
+        
+        .export-bar { display: flex; gap: 8px; padding: 10px; }
+        .export-bar button { flex: 1; padding: 10px; background: #2563eb; border: none; border-radius: 8px; color: white; font-size: 0.85rem; cursor: pointer; }
+        
+        .toggle-btns { display: flex; gap: 5px; margin-bottom: 10px; background: #1e293b; padding: 4px; border-radius: 8px; }
+        .toggle-btns button { flex: 1; padding: 8px; border: none; background: transparent; color: #64748b; border-radius: 6px; font-size: 0.85rem; cursor: pointer; }
+        .toggle-btns button.active { background: #2563eb; color: white; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="header">
+        <h1><i class="fas fa-th-large"></i> Dépôt Verre Pro</h1>
+        <p>Gestion stock caisses - Realme 14 Pro</p>
+    </div>
+    
+    <div class="stats">
+        <div class="stat"><h3 id="stC">0</h3><p>Caisses</p></div>
+        <div class="stat"><h3 id="stF">0</h3><p>Feuilles</p></div>
+        <div class="stat"><h3 id="stM">0</h3><p>m²</p></div>
+        <div class="stat"><h3 id="stA">0</h3><p>Alertes</p></div>
+    </div>
+    
+    <div class="card">
+        <div class="card-title"><i class="fas fa-barcode"></i> Saisie du code</div>
+        
+        <div class="mode">
+            <button class="active" onclick="setM('in',this)">ENTRÉE</button>
+            <button onclick="setM('out',this)">SORTIE</button>
+        </div>
+        
+        <input type="text" class="input-big" id="code" placeholder="Scanne ou colle le code ici" onkeydown="if(event.key==='Enter')parse()">
+        <button class="btn btn-blue" onclick="paste()"><i class="fas fa-paste"></i> Coller depuis presse-papier</button>
+        
+        <div class="detected" id="info">
+            <h4><i class="fas fa-check-circle"></i> Code reconnu</h4>
+            <div class="grid-2">
+                <div class="info-cell"><div class="label">Type</div><div class="value" id="iT">-</div></div>
+                <div class="info-cell"><div class="label">Épaisseur</div><div class="value" id="iE">-</div></div>
+                <div class="info-cell"><div class="label">Dimension</div><div class="value" id="iD">-</div></div>
+                <div class="info-cell"><div class="label">Feuilles</div><div class="value" id="iF">-</div></div>
+                <div class="info-cell"><div class="label">Stock</div><div class="value" id="iS">0</div></div>
+                <div class="info-cell"><div class="label">m²/caisse</div><div class="value" id="iM">0</div></div>
+            </div>
+        </div>
+        
+        <form id="form" onsubmit="save(event)">
+            <input type="hidden" id="m" value="in">
+            <input type="hidden" id="bc" value="">
+            
+            <div class="form-group">
+                <label>Type de verre *</label>
+                <select id="t" required onchange="ld()">
+                    <option value="">Choisir...</option>
+                    <option value="Clair">Verre Clair</option>
+                    <option value="Feuillete">Verre Feuilleté</option>
+                    <option value="Couche">Verre à Couche</option>
+                    <option value="Miroir">Verre Miroir</option>
+                    <option value="Trempe">Verre Trempé</option>
+                </select>
+            </div>
+            
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Épaisseur (mm) *</label>
+                    <select id="e" required></select>
+                </div>
+                <div class="form-group">
+                    <label>Dimension *</label>
+                    <select id="d" required onchange="cm()"></select>
+                </div>
+            </div>
+            
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Feuilles/caisse *</label>
+                    <input type="number" id="f" value="1" min="1" required onchange="cm()">
+                </div>
+                <div class="form-group">
+                    <label>Nb caisses *</label>
+                    <input type="number" id="n" value="1" min="1" required>
+                </div>
+            </div>
+            
+            <div class="form-group">
+                <label>Référence / BL</label>
+                <input type="text" id="r" placeholder="Ex: BL-2024-001">
+            </div>
+            
+            <button type="submit" class="btn btn-green" id="sb">Valider l'entrée</button>
+        </form>
+    </div>
+    
+    <div class="card">
+        <div style="display:flex;justify-content:space-between;margin-bottom:10px;align-items:center">
+            <h3 style="color:#94a3b8"><i class="fas fa-warehouse"></i> Stock & Historique</h3>
+            <div class="toggle-btns">
+                <button class="active" onclick="setV('s',this)">Stock</button>
+                <button onclick="setV('h',this)">Historique</button>
+            </div>
+        </div>
+        
+        <div class="filters">
+            <button class="chip active" onclick="fil('all',this)">Tous</button>
+            <button class="chip" onclick="fil('Clair',this)">Clair</button>
+            <button class="chip" onclick="fil('Feuillete',this)">Feuilleté</button>
+            <button class="chip" onclick="fil('Couche',this)">Couche</button>
+            <button class="chip" onclick="fil('Miroir',this)">Miroir</button>
+            <button class="chip" onclick="fil('Trempe',this)">Trempé</button>
+        </div>
+        
+        <div class="form-group">
+            <input type="text" id="sr" placeholder="Rechercher..." onkeyup="rend()">
+        </div>
+        
+        <div id="cont"></div>
+    </div>
+    
+    <div class="export-bar">
+        <button onclick="expC()"><i class="fas fa-file-csv"></i> Export CSV</button>
+        <button onclick="expI()" style="background:#7c3aed"><i class="fas fa-boxes"></i> Inventaire</button>
+    </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const EPS=[3,4,5,6,8,10,12,15,19];
+const DIMS=[{l:'3210x2250',m2:7.2225},{l:'3210x2550',m2:8.1855},{l:'2250x1605',m2:3.611},{l:'2000x1500',m2:3.0},{l:'1500x1000',m2:1.5}];
+let S=JSON.parse(localStorage.getItem('v_s'))||{};
+let H=JSON.parse(localStorage.getItem('v_h'))||[];
+let V='s',F='all';
+
+function init(){
+let e=document.getElementById('e');e.innerHTML='<option value="">Épaisseur</option>';
+EPS.forEach(x=>e.innerHTML+=`<option value="${x}">${x}mm</option>`);
+ld();rend();st();
+document.getElementById('code').focus();
+}
+
+function ld(){
+let d=document.getElementById('d');d.innerHTML='<option value="">Dimension</option>';
+DIMS.forEach((x,i)=>d.innerHTML+=`<option value="${i}">${x.l} (${x.m2}m²)</option>`);
+}
+
+function cm(){
+let i=parseInt(document.getElementById('d').value);
+let f=parseInt(document.getElementById('f').value)||1;
+if(DIMS[i]) document.getElementById('iM').textContent=(DIMS[i].m2*f).toFixed(2);
+}
+
+function paste(){
+navigator.clipboard.readText().then(t=>{
+document.getElementById('code').value=t;
+parse();
+}).catch(()=>toast('Autorise le presse-papier','err'));
+}
+
+function parse(){
+let c=document.getElementById('code').value.trim();
+if(!c) return;
+let p=c.split('-');
+let M={'CLAIR':'Clair','CL':'Clair','FEUILLETE':'Feuillete','FEU':'Feuillete','FV':'Feuillete','COUCHE':'Couche','CO':'Couche','MIROIR':'Miroir','MI':'Miroir','TREMPE':'Trempe','TR':'Trempe','TV':'Trempe'};
+let t='',e='',di='',f='';
+
+if(p.length>=3){
+t=M[p[0].toUpperCase()]||'';
+e=parseFloat(p[1])||'';
+let ds=p[2];f=parseInt(p[3])||'';
+DIMS.forEach((d,i)=>{if(d.l.replace(/\s/g,'').toLowerCase()==ds.toLowerCase())di=i});
+}
+
+if(t) document.getElementById('t').value=t;
+if(e) document.getElementById('e').value=e;
+if(di!=='') document.getElementById('d').value=di;
+if(f) document.getElementById('f').value=f;
+document.getElementById('bc').value=c;
+
+document.getElementById('iT').textContent=t||'-';
+document.getElementById('iE').textContent=e?e+'mm':'-';
+document.getElementById('iD').textContent=di!==''?DIMS[di].l:'-';
+document.getElementById('iF').textContent=f||'-';
+
+let k=t+'|'+e+'|'+di;
+let s=S[k]?S[k].q:0;
+document.getElementById('iS').textContent=s;
+
+let m2=(di!==''&&f)?(DIMS[di].m2*f):0;
+document.getElementById('iM').textContent=m2.toFixed(2);
+document.getElementById('info').classList.add('show');
+
+document.getElementById('code').value='';
+cm();
+toast('Code reconnu !','ok');
+}
+
+function setM(m,b){
+document.getElementById('m').value=m;
+document.querySelectorAll('.mode button').forEach(x=>x.classList.remove('active','out'));
+b.classList.add('active');
+if(m=='out') b.classList.add('out');
+let sb=document.getElementById('sb');
+if(m=='in'){sb.className='btn btn-green';sb.textContent='Valider l\'entrée';}
+else{sb.className='btn btn-red';sb.textContent='Valider la sortie';}
+}
+
+function k(t,e,d){return t+'|'+e+'|'+d;}
+
+function save(e){
+e.preventDefault();
+let t=document.getElementById('t').value;
+let ep=parseFloat(document.getElementById('e').value);
+let di=parseInt(document.getElementById('d').value);
+let f=parseInt(document.getElementById('f').value);
+let n=parseInt(document.getElementById('n').value);
+let r=document.getElementById('r').value;
+let c=document.getElementById('bc').value;
+let m=document.getElementById('m').value;
+
+if(!t||!ep||isNaN(di)||!f||!n){toast('Remplis tous les champs','err');return;}
+
+let K=k(t,ep,di);
+let d=DIMS[di];
+let m2c=d.m2*f;
+
+if(!S[K]) S[K]={t:t,ep:ep,di:di,f:f,q:0,tf:0,tm2:0};
+if(m=='out'&&S[K].q<n){toast('Stock insuffisant: '+S[K].q,'err');return;}
+
+S[K].q+=(m=='in'?n:-n);
+S[K].tf=S[K].q*f;
+S[K].tm2=S[K].q*m2c;
+
+H.unshift({id:Date.now(),m:m,k:K,t:t,ep:ep,dim:d.l,f:f,n:n,tf:n*f,tm2:n*m2c,ref:r,bar:c,date:new Date().toISOString()});
+
+localStorage.setItem('v_s',JSON.stringify(S));
+localStorage.setItem('v_h',JSON.stringify(H));
+
+document.getElementById('n').value='1';
+document.getElementById('r').value='';
+document.getElementById('bc').value='';
+document.getElementById('info').classList.remove('show');
+
+rend();st();
+toast((m=='in'?'Entrée':'Sortie')+' de '+n+' caisse(s) OK','ok');
+document.getElementById('code').focus();
+}
+
+function setV(v,b){V=v;rend();}
+function fil(f,b){F=f;rend();}
+
+function rend(){
+let ct=document.getElementById('cont');
+let s=document.getElementById('sr').value.toLowerCase();
+
+if(V=='s'){
+let I=Object.entries(S).filter(([k,v])=>v.q>0);
+if(F!='all') I=I.filter(([k,v])=>v.t==F);
+if(s) I=I.filter(([k,v])=>v.t.toLowerCase().includes(s)||v.ep.toString().includes(s)||DIMS[v.di].l.includes(s));
+
+if(!I.length){ct.innerHTML='<div class="empty"><i class="fas fa-box-open"></i><p>Aucun stock</p></div>';return;}
+
+let h='';
+I.forEach(([k,v])=>{
+let l=v.q<=2;
+h+=`<div class="item">
+<div class="item-info">
+<h4>${v.t}</h4>
+<p>${v.ep}mm • ${DIMS[v.di].l} • ${v.f} feuilles/caisse</p>
+</div>
+<div style="text-align:right">
+<span class="badge ${l?'bg-red':'bg-green'}">${v.q} caisses</span>
+<p style="font-size:0.7rem;color:#64748b;margin-top:4px">${v.tm2.toFixed(2)} m²</p>
+</div>
+</div>`;
+});
+ct.innerHTML=h;
+}else{
+let I=[...H];
+if(F!='all') I=I.filter(x=>x.t==F);
+if(s) I=I.filter(x=>x.t.toLowerCase().includes(s)||x.ref.toLowerCase().includes(s));
+
+if(!I.length){ct.innerHTML='<div class="empty"><i class="fas fa-exchange-alt"></i><p>Aucun mouvement</p></div>';return;}
+
+let h='';
+I.forEach(x=>{
+let d=new Date(x.date).toLocaleString('fr-FR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'});
+h+=`<div class="history-item">
+<div class="hist-date">${d}</div>
+<div class="hist-content">
+<div>
+<span class="hist-type ${x.m=='in'?'hist-in':'hist-out'}">
+<i class="fas fa-arrow-${x.m=='in'?'down':'up'}"></i> ${x.m=='in'?'ENTRÉE':'SORTIE'} ${x.n} caisse(s)
+</span>
+<p style="font-size:0.8rem;color:#94a3b8;margin-top:2px">${x.t} ${x.ep}mm • ${x.dim}</p>
+${x.ref?'<p style="font-size:0.75rem;color:#64748b"><i class="fas fa-file-alt"></i> '+x.ref+'</p>':''}
+${x.bar?'<p style="font-size:0.7rem;color:#475569"><i class="fas fa-barcode"></i> '+x.bar+'</p>':''}
+</div>
+<div style="text-align:right">
+<small style="color:#64748b">${x.tf} feuilles<br>${x.tm2.toFixed(2)} m²</small>
+</div>
+</div>
+</div>`;
+});
+ct.innerHTML=h;
+}
+}
+
+function st(){
+let c=0,f=0,m=0,a=0;
+Object.values(S).forEach(v=>{c+=v.q;f+=v.tf;m+=v.tm2;if(v.q<=2)a++});
+document.getElementById('stC').textContent=c;
+document.getElementById('stF').textContent=f;
+document.getElementById('stM').textContent=m.toFixed(1);
+document.getElementById('stA').textContent=a;
+}
+
+function expC(){
+let csv='Date,Type,Verre,Epaisseur,Dimension,Feuilles/Caisse,Caisses,Total Feuilles,Total m²,Reference,Code-Barres\n';
+H.forEach(x=>csv+=`"${new Date(x.date).toLocaleString('fr-FR')}","${x.m=='in'?'ENTREE':'SORTIE'}","${x.t}","${x.ep}","${x.dim}","${x.f}","${x.n}","${x.tf}","${x.tm2.toFixed(2)}","${x.ref||''}","${x.bar||''}"\n`);
+dl(csv,`mouvements_${new Date().toISOString().split('T')[0]}.csv`);
+}
+
+function expI(){
+let csv='Type,Epaisseur,Dimension,Feuilles/Caisse,Caisses,Total Feuilles,Total m²\n';
+Object.entries(S).forEach(([k,v])=>{if(v.q>0)csv+=`"${v.t}","${v.ep}","${DIMS[v.di].l}","${v.f}","${v.q}","${v.tf}","${v.tm2.toFixed(2)}"\n`;});
+dl(csv,`inventaire_${new Date().toISOString().split('T')[0]}.csv`);
+}
+
+function dl(c,f){
+let b=new Blob([c],{type:'text/csv'});
+let u=URL.createObjectURL(b);
+let a=document.createElement('a');
+a.href=u;a.download=f;a.click();
+URL.revokeObjectURL(u);
+toast('Fichier téléchargé','ok');
+}
+
+function toast(m,t){
+let x=document.getElementById('toast');
+x.textContent=m;
+x.className='toast show '+(t=='err'?'err':'');
+if(t=='err'){x.style.borderColor='#ef4444';x.style.color='#f87171';}
+else{x.style.borderColor='#22c55e';x.style.color='#4ade80';}
+setTimeout(()=>x.classList.remove('show'),3000);
+}
+
+init();
+</script>
+</body>
+</html>
