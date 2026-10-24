@@ -145,7 +145,12 @@
             </div>
             
             <div class="form-group">
-                <label>Référence / BL</label>
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px;">
+                    <label style="margin-bottom:0">Référence / BL</label>
+                    <label style="font-size:0.75rem;color:#60a5fa;cursor:pointer;display:flex;align-items:center;gap:4px">
+                        <input type="checkbox" id="keepRef" style="width:auto"> Garder la ref
+                    </label>
+                </div>
                 <input type="text" id="r" placeholder="Ex: BL-2024-001">
             </div>
             
@@ -181,6 +186,7 @@
     <div class="export-bar">
         <button onclick="expC()"><i class="fas fa-file-csv"></i> Export CSV</button>
         <button onclick="expI()" style="background:#7c3aed"><i class="fas fa-boxes"></i> Inventaire</button>
+        <button onclick="resetData()" style="background:#dc2626"><i class="fas fa-trash-alt"></i> RAZ Données</button>
     </div>
 </div>
 
@@ -221,7 +227,7 @@ parse();
 function parse(){
 let c=document.getElementById('code').value.trim();
 if(!c) return;
-let p=c.split('-');
+let p=c.split(/[-_/\s*]+/);
 let M={'CLAIR':'Clair','CL':'Clair','FEUILLETE':'Feuillete','FEU':'Feuillete','FV':'Feuillete','COUCHE':'Couche','CO':'Couche','MIROIR':'Miroir','MI':'Miroir','TREMPE':'Trempe','TR':'Trempe','TV':'Trempe'};
 let t='',e='',di='',f='';
 
@@ -298,7 +304,9 @@ localStorage.setItem('v_s',JSON.stringify(S));
 localStorage.setItem('v_h',JSON.stringify(H));
 
 document.getElementById('n').value='1';
-document.getElementById('r').value='';
+if(!document.getElementById('keepRef')?.checked){
+    document.getElementById('r').value='';
+}
 document.getElementById('bc').value='';
 document.getElementById('info').classList.remove('show');
 
@@ -309,6 +317,73 @@ document.getElementById('code').focus();
 
 function setV(v,b){V=v;rend();}
 function fil(f,b){F=f;rend();}
+
+function adjS(kRaw, delta){
+let key = decodeURIComponent(kRaw);
+if(!S[key]) return;
+let v = S[key];
+let d = DIMS[v.di];
+let m2c = d.m2 * v.f;
+
+if(delta < 0 && v.q + delta < 0){
+    toast('Stock déjà à 0','err');
+    return;
+}
+
+v.q += delta;
+v.tf = v.q * v.f;
+v.tm2 = v.q * m2c;
+
+H.unshift({
+    id: Date.now(),
+    m: delta > 0 ? 'in' : 'out',
+    k: key,
+    t: v.t,
+    ep: v.ep,
+    dim: d.l,
+    f: v.f,
+    n: Math.abs(delta),
+    tf: Math.abs(delta) * v.f,
+    tm2: Math.abs(delta) * m2c,
+    ref: 'Ajustement rapide',
+    bar: '',
+    date: new Date().toISOString()
+});
+
+localStorage.setItem('v_s', JSON.stringify(S));
+localStorage.setItem('v_h', JSON.stringify(H));
+
+rend(); st();
+toast((delta > 0 ? '+1' : '-1') + ' caisse ajustée', 'ok');
+}
+
+function delS(kRaw){
+let key = decodeURIComponent(kRaw);
+if(!S[key]) return;
+if(!confirm('Voulez-vous vraiment supprimer cet article du stock ?')) return;
+delete S[key];
+localStorage.setItem('v_s', JSON.stringify(S));
+rend(); st();
+toast('Article supprimé du stock', 'ok');
+}
+
+function delH(id){
+if(!confirm('Voulez-vous supprimer cette ligne d\'historique ?')) return;
+H = H.filter(x => x.id !== id);
+localStorage.setItem('v_h', JSON.stringify(H));
+rend();
+toast('Entrée d\'historique supprimée', 'ok');
+}
+
+function resetData(){
+if(!confirm('ATTENTION : Voulez-vous vraiment réinitialiser toutes les données (stock et historique) ?')) return;
+S = {};
+H = [];
+localStorage.removeItem('v_s');
+localStorage.removeItem('v_h');
+rend(); st();
+toast('Toutes les données ont été réinitialisées', 'ok');
+}
 
 function rend(){
 let ct=document.getElementById('cont');
@@ -324,14 +399,22 @@ if(!I.length){ct.innerHTML='<div class="empty"><i class="fas fa-box-open"></i><p
 let h='';
 I.forEach(([k,v])=>{
 let l=v.q<=2;
+let safeK = encodeURIComponent(k);
 h+=`<div class="item">
 <div class="item-info">
 <h4>${v.t}</h4>
-<p>${v.ep}mm • ${DIMS[v.di].l} • ${v.f} feuilles/caisse</p>
+<p>${v.ep}mm • ${DIMS[v.di].l} • ${v.f} ff/caisse</p>
 </div>
-<div style="text-align:right">
+<div style="text-align:right;display:flex;align-items:center;gap:10px">
+<div>
 <span class="badge ${l?'bg-red':'bg-green'}">${v.q} caisses</span>
 <p style="font-size:0.7rem;color:#64748b;margin-top:4px">${v.tm2.toFixed(2)} m²</p>
+</div>
+<div style="display:flex;gap:4px">
+<button onclick="adjS('${safeK}',1)" title="Ajouter 1 caisse" style="background:#16a34a;color:white;border:none;border-radius:6px;padding:6px 10px;cursor:pointer;font-weight:bold">+</button>
+<button onclick="adjS('${safeK}',-1)" title="Retirer 1 caisse" style="background:#dc2626;color:white;border:none;border-radius:6px;padding:6px 10px;cursor:pointer;font-weight:bold">-</button>
+<button onclick="delS('${safeK}')" title="Supprimer cet article" style="background:#475569;color:white;border:none;border-radius:6px;padding:6px 8px;cursor:pointer"><i class="fas fa-trash"></i></button>
+</div>
 </div>
 </div>`;
 });
@@ -357,8 +440,11 @@ h+=`<div class="history-item">
 ${x.ref?'<p style="font-size:0.75rem;color:#64748b"><i class="fas fa-file-alt"></i> '+x.ref+'</p>':''}
 ${x.bar?'<p style="font-size:0.7rem;color:#475569"><i class="fas fa-barcode"></i> '+x.bar+'</p>':''}
 </div>
-<div style="text-align:right">
+<div style="text-align:right;display:flex;align-items:center;gap:8px">
+<div>
 <small style="color:#64748b">${x.tf} feuilles<br>${x.tm2.toFixed(2)} m²</small>
+</div>
+<button onclick="delH(${x.id})" title="Supprimer cet enregistrement" style="background:transparent;color:#f87171;border:none;cursor:pointer;padding:4px"><i class="fas fa-times"></i></button>
 </div>
 </div>
 </div>`;
@@ -369,7 +455,7 @@ ct.innerHTML=h;
 
 function st(){
 let c=0,f=0,m=0,a=0;
-Object.values(S).forEach(v=>{c+=v.q;f+=v.tf;m+=v.tm2;if(v.q<=2)a++});
+Object.values(S).forEach(v=>{c+=v.q;f+=v.tf;m+=v.tm2;if(v.q>0&&v.q<=2)a++});
 document.getElementById('stC').textContent=c;
 document.getElementById('stF').textContent=f;
 document.getElementById('stM').textContent=m.toFixed(1);
@@ -389,7 +475,7 @@ dl(csv,`inventaire_${new Date().toISOString().split('T')[0]}.csv`);
 }
 
 function dl(c,f){
-let b=new Blob([c],{type:'text/csv'});
+let b=new Blob(['\uFEFF'+c],{type:'text/csv;charset=utf-8;'});
 let u=URL.createObjectURL(b);
 let a=document.createElement('a');
 a.href=u;a.download=f;a.click();
